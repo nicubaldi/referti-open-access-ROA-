@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Referti Open Access</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      background-color: #f4f4f4;
+    }
+    h1, h2 {
+      text-align: center;
+    }
+    textarea, input, select {
+      width: 100%;
+      margin-bottom: 10px;
+      padding: 8px;
+      font-size: 16px;
+    }
+    textarea {
+      height: 150px;
+    }
+    button {
+      padding: 10px 20px;
+      margin-right: 10px;
+      font-size: 16px;
+    }
+    .output {
+      background-color: #fff;
+      padding: 10px;
+      border: 1px solid #ccc;
+      white-space: pre-wrap;
+    }
+    .features {
+      background-color: #e0f7fa;
+      padding: 20px;
+      margin-top: 30px;
+      border-radius: 10px;
+    }
+    ul {
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Referti Open Access</h1>
+
+  <div>
+    <h3>🔑 Login / Registrazione</h3>
+    <input type="email" id="email" placeholder="Email" />
+    <input type="password" id="password" placeholder="Password" />
+    <button onclick="signUp()">Registrati</button>
+    <button onclick="signIn()">Accedi</button>
+    <p id="authStatus"></p>
+  </div>
+
+  <div id="refertoForm" style="display:none">
+    <p><strong>Tipo di esame:</strong></p>
+    <select id="examType">
+      <option value="TAC">TAC</option>
+      <option value="Ecografia">Ecografia</option>
+      <option value="RMN">RMN</option>
+      <option value="RX">RX</option>
+    </select>
+
+    <p><strong>Indicazione clinica:</strong></p>
+    <input type="text" id="clinicalIndication" placeholder="Inserisci indicazione clinica" />
+
+    <p><strong>Dettatura vocale:</strong></p>
+    <button onclick="startDictation()">🎙 Avvia Dettatura</button>
+    <textarea id="transcript" placeholder="Il testo dettato apparirà qui..."></textarea>
+
+    <button onclick="generateReport()">📄 Genera Referto</button>
+    <button onclick="saveReport()">💾 Salva Referto</button>
+
+    <h2>Referto Strutturato</h2>
+    <div class="output" id="structuredReport"></div>
+  </div>
+
+  <script>
+    const supabase = supabase.createClient('https://your-project-id.supabase.co', 'public-anon-key');
+
+    async function signUp() {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const { user, error } = await supabase.auth.signUp({ email, password });
+      document.getElementById('authStatus').textContent = error ? error.message : 'Registrazione completata. Controlla l'email.';
+    }
+
+    async function signIn() {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const { user, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        document.getElementById('authStatus').textContent = error.message;
+      } else {
+        document.getElementById('authStatus').textContent = 'Accesso effettuato';
+        document.getElementById('refertoForm').style.display = 'block';
+      }
+    }
+
+    function startDictation() {
+      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      recognition.lang = 'it-IT';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.onresult = function(event) {
+        document.getElementById('transcript').value += event.results[0][0].transcript + '. ';
+      };
+
+      recognition.onerror = function(event) {
+        alert('Errore nella dettatura: ' + event.error);
+      };
+
+      recognition.start();
+    }
+
+    function generateReport() {
+      const tipoEsame = document.getElementById('examType').value;
+      const indicazioneClinica = document.getElementById('clinicalIndication').value.trim();
+      const testo = document.getElementById('transcript').value.trim();
+      const report = `**Esame:** ${tipoEsame}
+**Indicazione clinica:** ${indicazioneClinica || '[Non specificata]'}
+**Metodica d'esame:** ${tipoEsame} eseguita secondo protocollo standard.
+
+**Contenuto del referto:**
+${testo}
+
+**Conclusioni:**
+[Inserire qui la sintesi clinica derivante dal contenuto.]
+
+**Suggerimenti per il management:**
+[Eventuali consigli per follow-up, ulteriori indagini o trattamento.]`;
+      document.getElementById('structuredReport').textContent = report;
+    }
+
+    async function saveReport() {
+      const report = document.getElementById('structuredReport').textContent;
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) {
+        alert('Effettua il login prima di salvare.');
+        return;
+      }
+      const { error } = await supabase.from('referti').insert([
+        { user_id: user.id, contenuto: report }
+      ]);
+      if (error) {
+        alert('Errore salvataggio: ' + error.message);
+      } else {
+        alert('Referto salvato con successo.');
+      }
+    }
+  </script>
+</body>
+</html>
